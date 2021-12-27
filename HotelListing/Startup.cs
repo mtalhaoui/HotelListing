@@ -2,6 +2,7 @@ using HotelListing.Configurations;
 using HotelListing.Data;
 using HotelListing.IRepository;
 using HotelListing.Repository;
+using HotelListing.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,10 @@ namespace HotelListing
                 options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection"))
             );
 
+            services.AddAuthentication();
+            services.ConfigureIdentity();
+            services.ConfigureJwt(Configuration);
+
             services.AddCors(o =>
             {
                 o.AddPolicy("CorsPolicy", builder =>
@@ -39,6 +44,7 @@ namespace HotelListing
             services.AddAutoMapper(typeof(MappingProfile));
 
             services.AddTransient<IUnitOfWork, UnitOfWork>();
+            services.AddScoped<IAuthManager, AuthManager>();
 
             services.AddSwaggerGen(c =>
             {
@@ -62,8 +68,8 @@ namespace HotelListing
 
             app.UseCors("CorsPolicy");
 
+            app.UseAuthentication();
             app.UseRouting();
-
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
