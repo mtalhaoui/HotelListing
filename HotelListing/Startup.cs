@@ -1,3 +1,4 @@
+using AspNetCoreRateLimit;
 using HotelListing.Configurations;
 using HotelListing.Data;
 using HotelListing.IRepository;
@@ -5,6 +6,7 @@ using HotelListing.Repository;
 using HotelListing.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +31,13 @@ namespace HotelListing
                 options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection"))
             );
 
+            services.AddMemoryCache();
+
+            services.ConfigureRateLimiting();
+            services.AddHttpContextAccessor();
+
+            services.ConfigureHttpCacheHeaders();
+
             services.AddAuthentication();
             services.ConfigureIdentity();
             services.ConfigureJwt(Configuration);
@@ -51,8 +60,16 @@ namespace HotelListing
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "HotelListing", Version = "v1" });
             });
 
-            services.AddControllers().AddNewtonsoftJson(option =>
-                option.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
+            services.AddControllers(config => 
+            {
+                config.CacheProfiles.Add("120SecondsDuration", new CacheProfile
+                {
+                    Duration = 120
+                });
+            })
+            .AddNewtonsoftJson(option => option.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
+
+            services.ConfigureVersioning();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -64,12 +81,19 @@ namespace HotelListing
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "HotelListing v1"));
             }
 
+            app.ConfigureExceptionHandler();
+
             app.UseHttpsRedirection();
 
             app.UseCors("CorsPolicy");
 
-            app.UseAuthentication();
+            app.UseResponseCaching();
+            app.UseHttpCacheHeaders();
+            app.UseIpRateLimiting();
+
             app.UseRouting();
+
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
